@@ -1,0 +1,10 @@
+[project]
+name = "uv-devcontainer-template"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "glom==24.*",
+    "pytest==8.*",
+]

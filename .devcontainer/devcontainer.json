@@ -1,0 +1,28 @@
+{
+	"image": "mcr.microsoft.com/devcontainers/base:1-bookworm",
+	"features": {
+		"ghcr.io/jsburckhardt/devcontainer-features/uv:1": {},
+		"ghcr.io/devcontainers/features/git:1": {},
+		"ghcr.io/devcontainers/features/python:1": {}
+	},
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"ms-python.python",
+				"ms-python.vscode-pylance",
+				"ms-python.debugpy",
+				"ms-python.pylint",
+				"ms-python.black-formatter",
+				"ms-python.isort",
+				"github.copilot",
+				"github.copilot-chat",
+				"mikestead.dotenv",
+				"tamasfe.even-better-toml",
+				"redhat.vscode-yaml",
+				"DavidAnson.vscode-markdownlint",
+				"donjayamanne.githistory",
+				"mutantdino.resourcemonitor"
+			]
+		}
+	}
+}
