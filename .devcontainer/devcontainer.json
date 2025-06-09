@@ -1,5 +1,7 @@
 {
-	"image": "mcr.microsoft.com/devcontainers/base:1-bookworm",
+	"dockerComposeFile": "docker-compose.yml",
+  	"service": "app",
+	"workspaceFolder": "/workspace",
 	"features": {
 		"ghcr.io/jsburckhardt/devcontainer-features/uv:1": {},
 		"ghcr.io/devcontainers/features/git:1": {},

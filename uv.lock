@@ -999,7 +999,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "asyncpg" },
-    { name = "cognito-jwt-verifier", specifier = ">=0.0.3" },
+    { name = "cognito-jwt-verifier" },
     { name = "fastapi", extras = ["standard"] },
     { name = "passlib", extras = ["argon2"] },
     { name = "pydantic" },

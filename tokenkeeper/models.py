@@ -12,10 +12,6 @@ class TokenResponse(BaseModel):
     token: str
 
 
-class TokenVerify(BaseModel):
-    token: str
-
-
 class TokenRevoke(BaseModel):
     name: str
 

@@ -2,14 +2,14 @@ import logging
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Header
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .auth import get_current_user, verifier
 from .db import engine, get_session
-from .models import TokenCreate, TokenRead, TokenResponse, TokenRevoke, TokenVerify
+from .models import TokenCreate, TokenRead, TokenResponse, TokenRevoke
 from .tables import Token, User
 from .utils import generate_token, hash_token, parse_token, verify_token
 
@@ -107,9 +107,14 @@ async def create_token(
 
 
 @app.post("/token/verify")
-async def verify(data: TokenVerify, session: AsyncSession = Depends(get_session)):
+async def verify(authorization: str = Header(...), session: AsyncSession = Depends(get_session)):
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=403, detail="Missing or invalid Bearer token")
+
+    token_value = authorization.removeprefix("Bearer ").strip()
+
     try:
-        prefix, secret = parse_token(data.token)
+        prefix, secret = parse_token(token_value)
     except ValueError:
         raise HTTPException(status_code=403, detail="Invalid or unauthorized token")
 
