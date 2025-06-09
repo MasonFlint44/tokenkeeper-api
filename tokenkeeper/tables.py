@@ -22,7 +22,6 @@ class User(Base):
 class Token(Base):
     __tablename__ = "tokens"
     __table_args__ = (
-        UniqueConstraint("user", "name", name="uq_user_name"),
         Index("ix_user_name", "user", "name"),
     )
     prefix: Mapped[str] = mapped_column(String(32), primary_key=True)

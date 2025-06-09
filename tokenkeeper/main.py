@@ -2,7 +2,7 @@ import logging
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
-from fastapi import Depends, FastAPI, HTTPException, Header
+from fastapi import Depends, FastAPI, Header, HTTPException
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -75,13 +75,27 @@ async def create_token(
         session.add(User(username=username))
         await session.commit()
 
+    now = datetime.now(timezone.utc)
+
+    # Only reject if there's an *active* token with the same name
     existing_token = await session.execute(
-        select(Token).where(Token.user == username, Token.name == data.name)
+        select(Token)
+        .where(
+            Token.user == username,
+            Token.name == data.name,
+            Token.revoked == False,
+            (Token.expires_at.is_(None) | (Token.expires_at > now)),
+        )
+        .limit(1)
     )
     if existing_token.scalar_one_or_none():
-        logger.warning("Duplicate token name for user '%s'", username)
+        logger.warning(
+            "Active token with name '%s' already exists for user '%s'",
+            data.name,
+            username,
+        )
         raise HTTPException(
-            status_code=409, detail="Token name already exists for user"
+            status_code=409, detail="Active token name already exists for user"
         )
 
     prefix, secret, full_token = generate_token()
@@ -107,7 +121,9 @@ async def create_token(
 
 
 @app.post("/token/verify")
-async def verify(authorization: str = Header(...), session: AsyncSession = Depends(get_session)):
+async def verify(
+    authorization: str = Header(...), session: AsyncSession = Depends(get_session)
+):
     if not authorization.startswith("Bearer "):
         raise HTTPException(status_code=403, detail="Missing or invalid Bearer token")
 
