@@ -122,7 +122,8 @@ async def create_token(
 
 @app.post("/token/verify")
 async def verify(
-    authorization: str = Header(...), session: AsyncSession = Depends(get_session)
+    authorization: str = Header(...),
+    session: AsyncSession = Depends(get_session),
 ):
     if not authorization.startswith("Bearer "):
         raise HTTPException(status_code=403, detail="Missing or invalid Bearer token")
@@ -135,21 +136,21 @@ async def verify(
         raise HTTPException(status_code=403, detail="Invalid or unauthorized token")
 
     now = datetime.now(timezone.utc)
+
     result = await session.execute(
-        select(Token).where(Token.prefix == prefix, Token.revoked == False)
+        select(Token).where(
+            Token.prefix == prefix,
+            Token.revoked == False,
+            (Token.expires_at.is_(None) | (Token.expires_at > now)),
+        )
     )
     token = result.scalar_one_or_none()
 
-    if token:
-        if token.expires_at is not None and token.expires_at < now:
-            logger.warning("Token expired for user '%s'", token.user)
-            raise HTTPException(status_code=403, detail="Invalid or unauthorized token")
-
-        if verify_token(secret, token.hashed_token):
-            token.last_used = now
-            await session.commit()
-            logger.info("Token verified for user '%s'", token.user)
-            return {"valid": True, "user": token.user}
+    if token and verify_token(secret, token.hashed_token):
+        token.last_used = now
+        await session.commit()
+        logger.info("Token verified for user '%s'", token.user)
+        return {"valid": True, "user": token.user}
 
     logger.warning("Failed token verification")
     raise HTTPException(status_code=403, detail="Invalid or unauthorized token")
