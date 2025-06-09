@@ -5,6 +5,25 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Python: FastAPI",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "fastapi",
+            "args": [
+                "dev",
+                "tokenkeeper",
+                "--host",
+                "0.0.0.0",
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "serverReadyAction": {
+                "pattern": "Application startup complete.",
+                "uriFormat": "http://localhost:8000/docs",
+                "action": "openExternally"
+            }
+        },
+        {
             "name": "Python Debugger: Current File",
             "type": "debugpy",
             "request": "launch",
