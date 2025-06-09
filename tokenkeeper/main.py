@@ -25,6 +25,7 @@ async def lifespan(app: FastAPI):
     try:
         yield
     finally:
+        await engine.dispose()
         await verifier.close()
 
 
