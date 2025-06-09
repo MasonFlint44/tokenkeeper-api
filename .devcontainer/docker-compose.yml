@@ -8,6 +8,8 @@ services:
     command: sleep infinity
     depends_on:
       - postgres
+    ports:
+      - "8000:8000"
 
   postgres:
     image: postgres:15
@@ -16,6 +18,8 @@ services:
       POSTGRES_USER: user
       POSTGRES_PASSWORD: password
       POSTGRES_DB: tokenkeeper
+    ports:
+      - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
 
