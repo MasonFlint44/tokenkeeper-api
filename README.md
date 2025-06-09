@@ -1,54 +1,51 @@
-# UV Devcontainer Template
+# TokenKeeper API
 
-This template is designed to streamline the setup of a Python development environment using the `uv` package manager on Debian Bookworm. It's equipped with a collection of tools and extensions specifically chosen to enhance the Python development workflow, from code writing to testing and deployment.
+**TokenKeeper** is a secure, FastAPI-based service for managing and verifying personal access tokens. It integrates with AWS Cognito for user authentication and uses PostgreSQL for persistent storage. Tokens are hashed with Argon2 and optionally support expiration, revocation, and last-used tracking.
 
-## Features Overview
+## Features
 
-| Feature                 | Description                                                                                           |
-|-------------------------|-------------------------------------------------------------------------------------------------------|
-| **Operating System**    | Debian Bookworm, providing a stable foundation for development.                                       |
-| **Package Management**  | `uv`, a lightweight and efficient package and environment manager.                                    |
-| **Programming Language**| Python, ready for development right out of the box.                                                  |
-| **Version Control**     | Git integrated for robust version control.                                                           |
-| **VSCode Extensions**   | A curated list of VSCode extensions installed, including essentials for Python development.           |
-| **Testing Framework**   | Pytest configured to run tests from the `tests` directory, utilizing VSCode's test runner for ease of testing. |
+- 🔐 Secure token generation using Argon2 hashing
+- 📅 Optional token expiration and usage tracking
+- ✅ Verification and revocation of tokens
+- 🧾 List non-revoked, non-expired tokens
+- 🪪 Cognito-based user authentication
+- 🗃️ PostgreSQL + SQLAlchemy (async) backend
+
+## API Endpoints
+
+- `POST /token` — Create a new token
+- `POST /token/verify` — Verify token validity
+- `POST /token/revoke` — Revoke a token by name
+- `GET /token` — List current user’s active tokens
+
+## Requirements
+
+- Python 3.12+
+- PostgreSQL
+- AWS Cognito User Pool
+- `asyncpg`, `sqlalchemy`, `fastapi`, `passlib[argon2]`, `cognito-jwt-verifier`
 
 ## Getting Started
 
-1. **Clone and Open**: Clone this repository and open it in VSCode. The project will prompt to reopen in a devcontainer.
-1. **Dev Environment Initialization**: The `uv sync` task can be run manually, preparing and updating your development environment.
-1. **Rename the Project Directory**: Rename the `/project` directory to match the name of your new project to get started. Update the project name in the pyproject.toml file as well.
+1. Update your database URL in db.py:
 
-## Managing Dependencies
+```python
+DATABASE_URL = "postgresql+asyncpg://user:password@localhost/tokenkeeper"
+```
 
-- **Application Dependencies**: Defined in `pyproject.toml`. A frozen set of these dependencies is created and stored in `uv.lock` for reproducible deployments.
+2. Set up your Cognito issuer and client ID in auth.py:
 
-## Running Tests
+```python
+ISSUER = "https://cognito-idp.<region>.amazonaws.com/<user_pool_id>"
+CLIENT_IDS = ["<app_client_id>"]
+```
 
-Tests are run using VSCode's integrated test runner:
+3. Run the FastAPI app:
 
-1. Navigate to the testing sidebar in VSCode.
-1. You'll see your tests listed there. Test can be run directly from the UI.
-
-## Running the Application
-
-VSCode's `launch.json` is configured to debug the currently open Python file, allowing you to run and debug any part of your project easily.
-
-> Note: You may need to tweak `launch.json` for specific project requirements, such as adding arguments or setting environment variables.
-
-### Quick Start
-
-- Open `project/main.py` or any Python file you intend to run.
-- Use `F5` or the green play button in the "Run and Debug" sidebar to start debugging.
-
-## Deployment
-
-Deploy your application using the dependencies detailed in `uv.lock` to guarantee that your deployment mirrors the tested state of your application.
-
-## Contributing
-
-We welcome contributions to improve the `uv-devcontainer-template`. Please follow the standard fork and pull request workflow. Make sure to add tests for new features and update the documentation as necessary.
+```bash
+uvicorn tokenkeeper.main:app --reload
+```
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE.md).
+MIT
