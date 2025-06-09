@@ -11,5 +11,5 @@ dependencies = [
     "sqlalchemy[asyncio]",
     "pydantic",
     "passlib[argon2]",
-    "cognito-jwt-verifier"
+    "cognito-jwt-verifier",
 ]

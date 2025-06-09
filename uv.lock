@@ -219,7 +219,7 @@ wheels = [
 
 [[package]]
 name = "cognito-jwt-verifier"
-version = "0.0.1"
+version = "0.0.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
@@ -227,9 +227,9 @@ dependencies = [
     { name = "pytest" },
     { name = "pytest-asyncio" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/78/52/a2c6157ae2dfc62fc7274e8d5fc07174b3bfb2a6cf0803fa322dcae75b78/cognito_jwt_verifier-0.0.1.tar.gz", hash = "sha256:8913e31e008a04dd7d2fc783e364f9e72867cf10f32a5e62a211ca02cc97f4dc", size = 6335, upload-time = "2025-06-05T03:47:27.822Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/64/5a/68b7e443ba21ea2ac6450e23aff416801466e0fc998f4ebc01fae534fdc7/cognito_jwt_verifier-0.0.3.tar.gz", hash = "sha256:3b69c9cc5011c1c9ce43e42da5c11bdc8cd27b10b2d610acc0953d15af4c6420", size = 6004, upload-time = "2025-06-09T04:22:40.175Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/9d/b1/2fb1e27a85616e71b5962ca5df6b2cf9b6810bca7454d915817852370957/cognito_jwt_verifier-0.0.1-py3-none-any.whl", hash = "sha256:962505736eb1ed88ab4375d472380afdf2d88b3de4c3e4695bd1060d37f88512", size = 5135, upload-time = "2025-06-05T03:47:26.548Z" },
+    { url = "https://files.pythonhosted.org/packages/49/a5/0e2c00b31b6246539460dd439152c5e95d5e3c42f228c8e5c37d199e1163/cognito_jwt_verifier-0.0.3-py3-none-any.whl", hash = "sha256:25e9c4917977ca0ca9ff63126bdb7f7ec6a4b54377ab0a313ffbddcc218e21dc", size = 4910, upload-time = "2025-06-09T04:22:38.754Z" },
 ]
 
 [[package]]
@@ -999,7 +999,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "asyncpg" },
-    { name = "cognito-jwt-verifier" },
+    { name = "cognito-jwt-verifier", specifier = ">=0.0.3" },
     { name = "fastapi", extras = ["standard"] },
     { name = "passlib", extras = ["argon2"] },
     { name = "pydantic" },
