@@ -166,14 +166,24 @@ async def revoke(
     if not username:
         raise HTTPException(status_code=401, detail="Missing username in token")
 
+    now = datetime.now(timezone.utc)
+
+    # Only consider active tokens with matching user and name
     result = await session.execute(
-        select(Token).where(Token.name == data.name, Token.user == username)
+        select(Token).where(
+            Token.user == username,
+            Token.name == data.name,
+            Token.revoked == False,
+            (Token.expires_at.is_(None) | (Token.expires_at > now)),
+        )
     )
     token = result.scalar_one_or_none()
 
-    if not token or token.revoked:
-        logger.warning("Unauthorized or redundant revocation for user '%s'", username)
-        raise HTTPException(status_code=403, detail="Invalid or unauthorized token")
+    if not token:
+        logger.warning(
+            "No active token to revoke for user '%s' and name '%s'", username, data.name
+        )
+        raise HTTPException(status_code=403, detail="No active token found to revoke")
 
     token.revoked = True
     await session.commit()
