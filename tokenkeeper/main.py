@@ -1,14 +1,11 @@
 import logging
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
 
 from fastapi import Depends, FastAPI, Header, HTTPException
-from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from .auth import get_current_user, verifier
-from .db import engine, get_session
+from .data import TokensDataAccess, UsersDataAccess
+from .db import engine
 from .models import TokenCreate, TokenRead, TokenResponse, TokenRevoke
 from .tables import Token, User
 from .utils import generate_token, hash_token, parse_token, verify_token
@@ -35,27 +32,21 @@ app = FastAPI(lifespan=lifespan)
 @app.get("/token", response_model=list[TokenRead])
 async def list_tokens(
     claims: dict = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
+    tokens_data_access: TokensDataAccess = Depends(),
 ):
     username = claims.get("username")
     if not username:
         raise HTTPException(status_code=401, detail="Missing username in token")
 
-    now = datetime.now(timezone.utc)
-
-    result = await session.execute(
-        select(Token.name, Token.created_at, Token.last_used, Token.expires_at).where(
-            Token.user == username,
-            Token.revoked == False,
-            (Token.expires_at.is_(None) | (Token.expires_at > now)),
-        )
-    )
-    tokens = result.all()
+    tokens = await tokens_data_access.list_active_tokens(username)
     return [
         TokenRead(
-            name=name, created_at=created_at, last_used=last_used, expires_at=expires_at
+            name=token.name,
+            created_at=token.created_at,
+            last_used=token.last_used,
+            expires_at=token.expires_at,
         )
-        for name, created_at, last_used, expires_at in tokens
+        for token in tokens
     ]
 
 
@@ -63,33 +54,19 @@ async def list_tokens(
 async def create_token(
     data: TokenCreate,
     claims: dict = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
+    tokens_data_access: TokensDataAccess = Depends(),
+    users_data_access: UsersDataAccess = Depends(),
 ):
     username = claims.get("username")
     if not username:
         raise HTTPException(status_code=401, detail="Missing username in token")
 
-    user_exists = await session.scalar(
-        select(User.username).where(User.username == username).limit(1)
-    )
-    if not user_exists:
-        session.add(User(username=username))
-        await session.commit()
+    await users_data_access.ensure_user_exists(username)
 
-    now = datetime.now(timezone.utc)
-
-    # Only reject if there's an *active* token with the same name
-    existing_token = await session.execute(
-        select(Token)
-        .where(
-            Token.user == username,
-            Token.name == data.name,
-            Token.revoked == False,
-            (Token.expires_at.is_(None) | (Token.expires_at > now)),
-        )
-        .limit(1)
-    )
-    if existing_token.scalar_one_or_none():
+    if (
+        await tokens_data_access.get_active_token_by_name(username, data.name)
+        is not None
+    ):
         logger.warning(
             "Active token with name '%s' already exists for user '%s'",
             data.name,
@@ -108,48 +85,36 @@ async def create_token(
         hashed_token=hashed,
         expires_at=data.expires_at,
     )
-    session.add(token)
-    try:
-        await session.commit()
-        logger.info("Token created for user '%s' with prefix '%s'", username, prefix)
-        return TokenResponse(token=full_token)
-    except IntegrityError:
-        await session.rollback()
+
+    success = await tokens_data_access.create_token(token)
+    if not success:
         logger.error("Token prefix collision for user '%s'", username)
         raise HTTPException(
             status_code=500, detail="Failed to generate a unique token prefix"
         )
 
+    logger.info("Token created for user '%s' with prefix '%s'", username, prefix)
+    return TokenResponse(token=full_token)
+
 
 @app.post("/token/verify")
 async def verify(
     authorization: str = Header(...),
-    session: AsyncSession = Depends(get_session),
+    tokens_data_access: TokensDataAccess = Depends(),
 ):
     if not authorization.startswith("Bearer "):
         raise HTTPException(status_code=403, detail="Missing or invalid Bearer token")
 
     token_value = authorization.removeprefix("Bearer ").strip()
-
     try:
         prefix, secret = parse_token(token_value)
     except ValueError:
         raise HTTPException(status_code=403, detail="Invalid or unauthorized token")
 
-    now = datetime.now(timezone.utc)
-
-    result = await session.execute(
-        select(Token).where(
-            Token.prefix == prefix,
-            Token.revoked == False,
-            (Token.expires_at.is_(None) | (Token.expires_at > now)),
-        )
-    )
-    token = result.scalar_one_or_none()
+    token = await tokens_data_access.get_active_token_by_prefix(prefix)
 
     if token and verify_token(secret, token.hashed_token):
-        token.last_used = now
-        await session.commit()
+        await tokens_data_access.touch_token(token)
         logger.info("Token verified for user '%s'", token.user)
         return {"valid": True, "user": token.user}
 
@@ -161,33 +126,19 @@ async def verify(
 async def revoke(
     data: TokenRevoke,
     claims: dict = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
+    tokens_data_access: TokensDataAccess = Depends(),
 ):
     username = claims.get("username")
     if not username:
         raise HTTPException(status_code=401, detail="Missing username in token")
 
-    now = datetime.now(timezone.utc)
+    success = await tokens_data_access.revoke_token_by_name(username, data.name)
 
-    # Only consider active tokens with matching user and name
-    result = await session.execute(
-        select(Token).where(
-            Token.user == username,
-            Token.name == data.name,
-            Token.revoked == False,
-            (Token.expires_at.is_(None) | (Token.expires_at > now)),
-        )
-    )
-    token = result.scalar_one_or_none()
-
-    if not token:
+    if not success:
         logger.warning(
             "No active token to revoke for user '%s' and name '%s'", username, data.name
         )
         raise HTTPException(status_code=403, detail="No active token found to revoke")
-
-    token.revoked = True
-    await session.commit()
 
     logger.info("Token revoked for user '%s' with name '%s'", username, data.name)
     return {"revoked": True}
