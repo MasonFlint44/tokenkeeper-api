@@ -64,7 +64,6 @@ async def create_token(
 
     logger.info("Creating token '%s' for user '%s'", data.name, username)
 
-    # Create user if it doesn't exist
     await users_data_access.ensure_user_exists(username)
 
     if (
@@ -115,7 +114,7 @@ async def verify(
     try:
         prefix, secret = parse_token(token_value)
     except ValueError:
-        raise HTTPException(status_code=403, detail="Invalid or unauthorized token")
+        raise HTTPException(status_code=403, detail="Token is invalid or unauthorized")
 
     logger.info("Verifying token with prefix '%s'", prefix)
     token = await tokens_data_access.get_active_token_by_prefix(prefix)
@@ -130,7 +129,7 @@ async def verify(
         return {"valid": True, "user": token.user}
 
     logger.warning("Token verification failed for prefix '%s'", prefix)
-    raise HTTPException(status_code=403, detail="Invalid or unauthorized token")
+    raise HTTPException(status_code=403, detail="Token is invalid or unauthorized")
 
 
 @app.post("/token/revoke")
