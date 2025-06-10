@@ -39,6 +39,7 @@ async def list_tokens(
         raise HTTPException(status_code=401, detail="Missing username in token")
 
     tokens = await tokens_data_access.list_active_tokens(username)
+    logger.info("Listed tokens for user '%s'", username)
     return [
         TokenRead(
             name=token.name,
@@ -61,6 +62,9 @@ async def create_token(
     if not username:
         raise HTTPException(status_code=401, detail="Missing username in token")
 
+    logger.info("Creating token '%s' for user '%s'", data.name, username)
+
+    # Create user if it doesn't exist
     await users_data_access.ensure_user_exists(username)
 
     if (
@@ -68,7 +72,7 @@ async def create_token(
         is not None
     ):
         logger.warning(
-            "Active token with name '%s' already exists for user '%s'",
+            "Conflict: Active token '%s' already exists for user '%s'",
             data.name,
             username,
         )
@@ -88,12 +92,14 @@ async def create_token(
 
     success = await tokens_data_access.create_token(token)
     if not success:
-        logger.error("Token prefix collision for user '%s'", username)
+        logger.error(
+            "Token creation failed due to prefix collision for user '%s'", username
+        )
         raise HTTPException(
             status_code=500, detail="Failed to generate a unique token prefix"
         )
 
-    logger.info("Token created for user '%s' with prefix '%s'", username, prefix)
+    logger.info("Token created with prefix '%s' for user '%s'", prefix, username)
     return TokenResponse(token=full_token)
 
 
@@ -111,14 +117,19 @@ async def verify(
     except ValueError:
         raise HTTPException(status_code=403, detail="Invalid or unauthorized token")
 
+    logger.info("Verifying token with prefix '%s'", prefix)
     token = await tokens_data_access.get_active_token_by_prefix(prefix)
 
     if token and verify_token(secret, token.hashed_token):
         await tokens_data_access.touch_token(token)
-        logger.info("Token verified for user '%s'", token.user)
+        logger.info(
+            "Token verified successfully for user '%s' (prefix: '%s')",
+            token.user,
+            prefix,
+        )
         return {"valid": True, "user": token.user}
 
-    logger.warning("Failed token verification")
+    logger.warning("Token verification failed for prefix '%s'", prefix)
     raise HTTPException(status_code=403, detail="Invalid or unauthorized token")
 
 
@@ -132,13 +143,16 @@ async def revoke(
     if not username:
         raise HTTPException(status_code=401, detail="Missing username in token")
 
+    logger.info("Revoking token '%s' for user '%s'", data.name, username)
     success = await tokens_data_access.revoke_token_by_name(username, data.name)
 
     if not success:
         logger.warning(
-            "No active token to revoke for user '%s' and name '%s'", username, data.name
+            "Revocation failed: no active token '%s' found for user '%s'",
+            data.name,
+            username,
         )
         raise HTTPException(status_code=403, detail="No active token found to revoke")
 
-    logger.info("Token revoked for user '%s' with name '%s'", username, data.name)
+    logger.info("Token '%s' successfully revoked for user '%s'", data.name, username)
     return {"revoked": True}
