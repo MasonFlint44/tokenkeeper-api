@@ -21,3 +21,20 @@ class TokenRead(BaseModel):
     created_at: datetime
     last_used: datetime | None = None
     expires_at: datetime | None = None
+
+
+class VerifyResponse(BaseModel):
+    valid: bool
+    user: str
+
+
+class RevokeResponse(BaseModel):
+    revoked: bool
+
+
+class ReadyResponse(BaseModel):
+    status: str
+
+
+class HealthResponse(BaseModel):
+    status: str

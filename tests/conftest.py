@@ -3,7 +3,7 @@ from asgi_lifespan import LifespanManager
 from httpx import ASGITransport, AsyncClient
 
 from tokenkeeper import app
-from tokenkeeper.auth import get_current_user
+from tokenkeeper.auth import get_current_username
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -13,7 +13,7 @@ def anyio_backend():
 
 @pytest.fixture(scope="session", autouse=True)
 def mock_get_current_user():
-    app.dependency_overrides[get_current_user] = lambda: {
+    app.dependency_overrides[get_current_username] = lambda: {
         "username": "testuser",
     }
 

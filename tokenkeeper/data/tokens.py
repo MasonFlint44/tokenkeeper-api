@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Iterable
 
 from fastapi import Depends
@@ -15,7 +15,7 @@ class TokensDataAccess:
         self.session = session
 
     async def list_active_tokens(self, username: str) -> Iterable[Token]:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         result = await self.session.scalars(
             select(Token).where(
                 Token.user == username,
@@ -26,7 +26,7 @@ class TokensDataAccess:
         return result.all()
 
     async def get_active_token_by_name(self, username: str, name: str) -> Token | None:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         result = await self.session.execute(
             select(Token)
             .where(
@@ -49,7 +49,7 @@ class TokensDataAccess:
             return False
 
     async def get_active_token_by_prefix(self, prefix: str) -> Token | None:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         result = await self.session.execute(
             select(Token)
             .where(
@@ -62,7 +62,7 @@ class TokensDataAccess:
         return result.scalar_one_or_none()
 
     async def revoke_token_by_name(self, username: str, name: str) -> bool:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         result = await self.session.execute(
             select(Token)
             .where(
@@ -82,5 +82,5 @@ class TokensDataAccess:
         return True
 
     async def touch_token(self, token: Token) -> None:
-        token.last_used = datetime.now(timezone.utc)
+        token.last_used = datetime.now(UTC)
         await self.session.commit()

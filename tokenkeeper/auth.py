@@ -12,12 +12,17 @@ oauth2_scheme = OAuth2AuthorizationCodeBearer(
 )
 
 
-async def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
+async def get_current_username(token: str = Depends(oauth2_scheme)) -> str:
     try:
-        return await verifier.verify_access_token(token)
+        claims = await verifier.verify_access_token(token)
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=str(exc),
+            detail="Invalid or missing Bearer token",
             headers={"WWW-Authenticate": "Bearer"},
         ) from exc
+
+    username = claims.get("username")
+    if not username:
+        raise HTTPException(status_code=401, detail="Missing username in token")
+    return username
