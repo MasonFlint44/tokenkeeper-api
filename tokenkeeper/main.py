@@ -163,19 +163,20 @@ async def verify(
         ) from exc
 
     logger.info("Verifying token with prefix '%s'", prefix)
-    token = await tokens_data_access.get_active_token_by_prefix(prefix)
+    async with tokens_data_access.lock_active_token(prefix) as token:
+        if not (token and verify_token(secret, token.hashed_token)):
+            # exception → auto-rollback, row lock released
+            logger.warning("Token verification failed for prefix '%s'", prefix)
+            raise HTTPException(
+                status.HTTP_401_UNAUTHORIZED,
+                "Token invalid",
+                headers={
+                    "WWW-Authenticate": 'Bearer realm="tokenkeeper", error="invalid_token"'
+                },
+            )
 
-    if not (token and verify_token(secret, token.hashed_token)):
-        logger.warning("Token verification failed for prefix '%s'", prefix)
-        raise HTTPException(
-            status.HTTP_401_UNAUTHORIZED,
-            "Token invalid",
-            headers={
-                "WWW-Authenticate": 'Bearer realm="tokenkeeper", error="invalid_token"'
-            },
-        )
+        tokens_data_access.touch_token(token)
 
-    await tokens_data_access.touch_token(token)
     logger.info(
         "Token verified successfully for user '%s' (prefix: '%s')",
         token.user,
@@ -200,7 +201,7 @@ async def revoke(
             username,
         )
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
+            status_code=status.HTTP_403_FORBIDDEN,
             detail=f"No active token found with name '{data.name}'",
         )
 

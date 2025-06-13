@@ -1,8 +1,8 @@
-from datetime import UTC, datetime
-from typing import Iterable
+from contextlib import asynccontextmanager
+from typing import AsyncGenerator, Iterable
 
 from fastapi import Depends
-from sqlalchemy import select
+from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -15,29 +15,29 @@ class TokensDataAccess:
         self.session = session
 
     async def list_active_tokens(self, username: str) -> Iterable[Token]:
-        now = datetime.now(UTC)
         result = await self.session.scalars(
-            select(Token).where(
+            select(Token)
+            .where(
                 Token.user == username,
-                Token.revoked == False,
-                (Token.expires_at.is_(None) | (Token.expires_at > now)),
+                Token.revoked.is_(False),
+                (Token.expires_at.is_(None) | (Token.expires_at > func.now())),
             )
+            .order_by(Token.created_at.desc())
         )
         return result.all()
 
     async def get_active_token_by_name(self, username: str, name: str) -> Token | None:
-        now = datetime.now(UTC)
-        result = await self.session.execute(
+        result = await self.session.scalars(
             select(Token)
             .where(
                 Token.user == username,
                 Token.name == name,
-                Token.revoked == False,
-                (Token.expires_at.is_(None) | (Token.expires_at > now)),
+                Token.revoked.is_(False),
+                (Token.expires_at.is_(None) | (Token.expires_at > func.now())),
             )
             .limit(1)
         )
-        return result.scalar_one_or_none()
+        return result.one_or_none()
 
     async def create_token(self, token: Token) -> bool:
         self.session.add(token)
@@ -48,39 +48,50 @@ class TokensDataAccess:
             await self.session.rollback()
             return False
 
-    async def get_active_token_by_prefix(self, prefix: str) -> Token | None:
-        now = datetime.now(UTC)
-        result = await self.session.execute(
-            select(Token)
-            .where(
-                Token.prefix == prefix,
-                Token.revoked == False,
-                (Token.expires_at.is_(None) | (Token.expires_at > now)),
+    @asynccontextmanager
+    async def lock_active_token(
+        self, prefix: str
+    ) -> AsyncGenerator[Token | None, None]:
+        """
+        Yield the active Token row (if any) locked FOR UPDATE inside a TX.
+        """
+        async with self.session.begin():  # opens TX, handles commit/rollback
+            stmt = (
+                select(Token)
+                .where(
+                    Token.prefix == prefix,
+                    Token.revoked.is_(False),
+                    (Token.expires_at.is_(None) | (Token.expires_at > func.now())),
+                )
+                .with_for_update()
+                .limit(1)
             )
-            .limit(1)
-        )
-        return result.scalar_one_or_none()
+
+            token: Token | None = await self.session.scalar(stmt)
+
+            try:
+                yield token
+            finally:
+                # Nothing else to do; session.begin() handles commit/rollback.
+                pass
 
     async def revoke_token_by_name(self, username: str, name: str) -> bool:
-        now = datetime.now(UTC)
-        result = await self.session.execute(
-            select(Token)
+        stmt = (
+            update(Token)
             .where(
                 Token.user == username,
                 Token.name == name,
-                Token.revoked == False,
-                (Token.expires_at.is_(None) | (Token.expires_at > now)),
+                Token.revoked.is_(False),
+                (Token.expires_at.is_(None) | (Token.expires_at > func.now())),
             )
-            .limit(1)
+            .values(revoked=True)
+            .returning(Token.prefix)
         )
-        token = result.scalar_one_or_none()
-        if not token:
-            return False
 
-        token.revoked = True
+        result = await self.session.execute(stmt)
         await self.session.commit()
-        return True
 
-    async def touch_token(self, token: Token) -> None:
-        token.last_used = datetime.now(UTC)
-        await self.session.commit()
+        return result.first() is not None
+
+    def touch_token(self, token: Token) -> None:
+        token.last_used = func.now()

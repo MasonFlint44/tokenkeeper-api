@@ -16,7 +16,7 @@ async def test_create_token(async_client: AsyncClient):
             },
         )
 
-        assert response.status_code == 200
+        assert response.status_code == 201
         response_json = response.json()
         tk_prefix, prefix, token = response_json["token"].split("_", 2)
         assert tk_prefix == "tk"
@@ -57,7 +57,7 @@ async def test_create_token_reuse_name_after_revocation(async_client):
         response = await async_client.post(
             "/token", json={"name": token_name, "expires_at": expires_at}
         )
-        assert response.status_code == 200
+        assert response.status_code == 201
     finally:
         await async_client.post("/token/revoke", json={"name": token_name})
 
@@ -77,7 +77,7 @@ async def test_create_token_reuse_name_after_expiry(async_client):
         response = await async_client.post(
             "/token", json={"name": token_name, "expires_at": fresh_at}
         )
-        assert response.status_code == 200
+        assert response.status_code == 201
     finally:
         await async_client.post("/token/revoke", json={"name": token_name})
 
@@ -106,7 +106,7 @@ async def test_create_token_missing_expires_at(async_client):
             "/token",
             json={"name": "no-expiry"},
         )
-        assert response.status_code == 200
+        assert response.status_code == 201
     finally:
         # Clean up by revoking the token after test
         await async_client.post("/token/revoke", json={"name": "no-expiry"})
@@ -169,7 +169,7 @@ async def test_token_verify_success(async_client):
 async def test_token_verify_invalid_token_format(async_client):
     headers = {"Authorization": "Bearer invalidtokenformat"}
     response = await async_client.post("/token/verify", headers=headers)
-    assert response.status_code == 403
+    assert response.status_code == 401
 
 
 async def test_token_verify_invalid_token(async_client):
@@ -177,7 +177,7 @@ async def test_token_verify_invalid_token(async_client):
         "Authorization": f"Bearer tk_{secrets.token_hex(16)}_{secrets.token_urlsafe(64)}"
     }
     response = await async_client.post("/token/verify", headers=headers)
-    assert response.status_code == 403
+    assert response.status_code == 401
 
 
 async def test_token_verify_expired_token(async_client):
@@ -192,7 +192,7 @@ async def test_token_verify_expired_token(async_client):
         verify_response = await async_client.post(
             "/token/verify", headers={"Authorization": f"Bearer {token_value}"}
         )
-        assert verify_response.status_code == 403
+        assert verify_response.status_code == 401
     finally:
         # Clean up by revoking the token after test
         await async_client.post("/token/revoke", json={"name": "expired-token"})
@@ -201,13 +201,13 @@ async def test_token_verify_expired_token(async_client):
 async def test_token_verify_empty_bearer_token(async_client):
     headers = {"Authorization": "Bearer "}
     response = await async_client.post("/token/verify", headers=headers)
-    assert response.status_code == 403
+    assert response.status_code == 401
 
 
 async def test_token_verify_missing_bearer_prefix(async_client):
     headers = {"Authorization": "tokenwithoutbearerprefix"}
     response = await async_client.post("/token/verify", headers=headers)
-    assert response.status_code == 403
+    assert response.status_code == 401
 
 
 async def test_revoke_token(async_client):
