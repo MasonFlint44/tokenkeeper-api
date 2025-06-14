@@ -2,7 +2,7 @@ from contextlib import asynccontextmanager
 from typing import AsyncGenerator, Iterable
 
 from fastapi import Depends
-from sqlalchemy import func, select, update
+from sqlalchemy import func, nulls_last, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -22,7 +22,7 @@ class TokensDataAccess:
                 Token.revoked.is_(False),
                 (Token.expires_at.is_(None) | (Token.expires_at > func.now())),
             )
-            .order_by(Token.created_at.desc())
+            .order_by(nulls_last(Token.last_used.desc()), Token.created_at.desc())
         )
         return result.all()
 
