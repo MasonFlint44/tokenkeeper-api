@@ -1,4 +1,6 @@
+import base64
 import logging
+import os
 from contextlib import asynccontextmanager
 from typing import Annotated
 
@@ -21,6 +23,8 @@ from .utils import generate_token, hash_token, parse_token, verify_token
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+verify_user = os.environ["TOKENKEEPER_VERIFY_USER"]
 
 
 @asynccontextmanager
@@ -112,16 +116,34 @@ async def verify(
     authorization: Annotated[str, Header()],
     tokens_data_access: TokensDataAccess = Depends(),
 ):
-    if not authorization.startswith("Bearer "):
+    if not authorization.startswith("Basic "):
         raise HTTPException(
             status.HTTP_401_UNAUTHORIZED,
-            "Missing bearer token",
+            "Missing basic auth token",
             headers={
-                "WWW-Authenticate": 'Bearer realm="tokenkeeper", error="invalid_request"'
+                "WWW-Authenticate": 'Basic realm="tokenkeeper", error="invalid_request"'
             },
         )
-    token_value = authorization.removeprefix("Bearer ").strip()
-
+    try:
+        b64 = authorization.removeprefix("Basic ").strip()
+        decoded = base64.b64decode(b64).decode()
+        username, token_value = decoded.split(":", 1)
+    except Exception:
+        raise HTTPException(
+            status.HTTP_401_UNAUTHORIZED,
+            "Invalid basic auth encoding",
+            headers={
+                "WWW-Authenticate": 'Basic realm="tokenkeeper", error="invalid_request"'
+            },
+        )
+    if username != verify_user:
+        raise HTTPException(
+            status.HTTP_401_UNAUTHORIZED,
+            "Invalid username for basic auth",
+            headers={
+                "WWW-Authenticate": 'Basic realm="tokenkeeper", error="invalid_request"'
+            },
+        )
     try:
         prefix, secret = parse_token(token_value)
     except ValueError as exc:
@@ -129,25 +151,21 @@ async def verify(
             status.HTTP_401_UNAUTHORIZED,
             "Token invalid",
             headers={
-                "WWW-Authenticate": 'Bearer realm="tokenkeeper", error="invalid_token"'
+                "WWW-Authenticate": 'Basic realm="tokenkeeper", error="invalid_token"'
             },
         ) from exc
-
     logger.info("Verifying token with prefix '%s'", prefix)
     async with tokens_data_access.lock_active_token(prefix) as token:
         if not (token and verify_token(secret, token.hashed_token)):
-            # exception → auto-rollback, row lock released
             logger.warning("Token verification failed for prefix '%s'", prefix)
             raise HTTPException(
                 status.HTTP_401_UNAUTHORIZED,
                 "Token invalid",
                 headers={
-                    "WWW-Authenticate": 'Bearer realm="tokenkeeper", error="invalid_token"'
+                    "WWW-Authenticate": 'Basic realm="tokenkeeper", error="invalid_token"'
                 },
             )
-
         tokens_data_access.touch_token(token)
-
     logger.info(
         "Token verified successfully for user '%s' (prefix: '%s')",
         token.user,
