@@ -1,0 +1,57 @@
+name: Build & Publish to PyPI
+
+on:
+  push:
+    tags:        # only run when you push a Git tag like v0.2.1
+      - "v*.*.*"
+  workflow_dispatch:  # allow manual runs from the Actions tab
+
+permissions:
+  contents: read
+  id-token: write       # needed for Trusted Publishing (PEP 740)
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"   # pick one build interpreter
+
+      - name: Install build tools
+        run: |
+          python -m pip install --upgrade pip build
+
+      - name: Build sdist + wheel
+        run: |
+          python -m build --sdist --wheel --outdir dist
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: pypi           # protects the PYPI_API_TOKEN secret
+    permissions:
+      contents: read
+      id-token: write           # again, for OIDC if you enable it
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@v1.12.4
+        with:
+          # Either use the classic API token…
+          password: ${{ secrets.PYPI_API_TOKEN }}
+          # …or comment the line above and opt into Trusted Publishing
+          # if your PyPI project has “GitHub Actions” as a trusted publisher.
