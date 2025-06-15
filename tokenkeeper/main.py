@@ -3,15 +3,11 @@ from contextlib import asynccontextmanager
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, Header, HTTPException, status
-from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from .auth import get_current_username, verifier
 from .data import TokensDataAccess, UsersDataAccess
-from .db import engine, get_session
+from .db import engine
 from .models import (
-    HealthResponse,
-    ReadyResponse,
     RevokeResponse,
     TokenCreate,
     TokenRead,
@@ -19,6 +15,7 @@ from .models import (
     TokenRevoke,
     VerifyResponse,
 )
+from .probes import router as probes_router
 from .tables import Token, User
 from .utils import generate_token, hash_token, parse_token, verify_token
 
@@ -40,33 +37,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
-
-@app.get("/healthz", response_model=HealthResponse)
-async def get_health():
-    """
-    Health check endpoint to verify the service is running.
-    """
-    logger.debug("Health check successful")
-    return HealthResponse(status="ok")
-
-
-@app.get("/readyz", response_model=ReadyResponse)
-async def get_ready(session: AsyncSession = Depends(get_session)):
-    """
-    Readiness check endpoint to verify the service is ready to accept requests.
-    """
-    try:
-        async with session as session:
-            await session.execute(text("SELECT 1"))
-    except Exception as exc:
-        logger.info("Readiness check unsuccessful")
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Service is not ready",
-        ) from exc
-
-    logger.debug("Readiness check successful")
-    return ReadyResponse(status="ready")
+app.include_router(probes_router, tags=["probes"])
 
 
 @app.get("/token", response_model=list[TokenRead])
