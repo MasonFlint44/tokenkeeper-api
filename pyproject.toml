@@ -1,6 +1,6 @@
 [project]
 name = "tokenkeeper-api"
-version = "0.0.1"
+version = "0.0.2"
 description = "A minimal FastAPI service for creating, verifying, and revoking user-scoped API tokens. Uses Argon2 hashing and PostgreSQL for secure token management."
 readme = "README.md"
 requires-python = ">=3.12"
