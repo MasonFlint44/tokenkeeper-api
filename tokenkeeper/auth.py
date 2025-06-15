@@ -1,14 +1,16 @@
+import os
+
 from cognito_jwt_verifier import AsyncCognitoJwtVerifier
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2AuthorizationCodeBearer
 
-ISSUER = "https://cognito-idp.us-east-2.amazonaws.com/us-east-2_AE7uogN5r"
-CLIENT_IDS = ["m95vusubvir6psn1mfac61ond"]
+issuer = os.environ["TOKENKEEPER_ISSUER"]
+client_ids = os.environ["TOKENKEEPER_CLIENT_IDS"].split(",")
 
-verifier = AsyncCognitoJwtVerifier(ISSUER, client_ids=CLIENT_IDS)
+verifier = AsyncCognitoJwtVerifier(issuer, client_ids=client_ids)
 oauth2_scheme = OAuth2AuthorizationCodeBearer(
-    authorizationUrl=f"{ISSUER}/oauth2/authorize",
-    tokenUrl=f"{ISSUER}/oauth2/token",
+    authorizationUrl=f"{issuer}/oauth2/authorize",
+    tokenUrl=f"{issuer}/oauth2/token",
 )
 
 
