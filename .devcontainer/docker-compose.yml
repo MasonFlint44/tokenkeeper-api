@@ -5,6 +5,7 @@ services:
     image: mcr.microsoft.com/devcontainers/base:1-bookworm
     volumes:
       - ..:/workspace:cached
+    env_file: devcontainer.env
     command: sleep infinity
     depends_on:
       - postgres

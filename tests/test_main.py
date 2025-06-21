@@ -1,4 +1,5 @@
 import asyncio
+import base64
 import secrets
 from datetime import datetime, timedelta, timezone
 
@@ -68,7 +69,10 @@ async def test_create_token_reuse_name_after_revocation(async_client):
         await async_client.post("/token/revoke", json={"name": token_name})
 
         response = await async_client.post(
-            "/token/verify", headers={"Authorization": f"Bearer {token}"}
+            "/token/verify",
+            headers={
+                "Authorization": f"Basic {base64.b64encode(f'podpilot:{token}'.encode()).decode()}"
+            },
         )
         assert response.status_code == 401  # Token should be revoked
 
@@ -80,7 +84,10 @@ async def test_create_token_reuse_name_after_revocation(async_client):
         token = response.json()["token"]
 
         response = await async_client.post(
-            "/token/verify", headers={"Authorization": f"Bearer {token}"}
+            "/token/verify",
+            headers={
+                "Authorization": f"Basic {base64.b64encode(f'podpilot:{token}'.encode()).decode()}"
+            },
         )
         assert response.status_code == 200
     finally:
@@ -100,7 +107,10 @@ async def test_create_token_reuse_name_after_expiry(async_client):
         token = response.json()["token"]
 
         response = await async_client.post(
-            "/token/verify", headers={"Authorization": f"Bearer {token}"}
+            "/token/verify",
+            headers={
+                "Authorization": f"Basic {base64.b64encode(f'podpilot:{token}'.encode()).decode()}"
+            },
         )
         assert response.status_code == 401  # Token should be expired
 
@@ -112,7 +122,10 @@ async def test_create_token_reuse_name_after_expiry(async_client):
         token = response.json()["token"]
 
         response = await async_client.post(
-            "/token/verify", headers={"Authorization": f"Bearer {token}"}
+            "/token/verify",
+            headers={
+                "Authorization": f"Basic {base64.b64encode(f'podpilot:{token}'.encode()).decode()}"
+            },
         )
         assert response.status_code == 200
         assert response.json()["valid"] is True
@@ -148,7 +161,10 @@ async def test_create_token_missing_expires_at(async_client):
         token = response.json()["token"]
 
         response = await async_client.post(
-            "/token/verify", headers={"Authorization": f"Bearer {token}"}
+            "/token/verify",
+            headers={
+                "Authorization": f"Basic {base64.b64encode(f'podpilot:{token}'.encode()).decode()}"
+            },
         )
         assert response.status_code == 200
         assert response.json()["valid"] is True
@@ -225,12 +241,16 @@ async def test_list_tokens_sorted_by_last_used(async_client: AsyncClient):
         # ------------------------------------------------------------------
         await async_client.post(
             "/token/verify",
-            headers={"Authorization": f"Bearer {token_strings['token-A']}"},
+            headers={
+                "Authorization": f"Basic {base64.b64encode(f'podpilot:{token_strings['token-A']}'.encode()).decode()}"
+            },
         )
         # await asyncio.sleep(0.5)
         await async_client.post(
             "/token/verify",
-            headers={"Authorization": f"Bearer {token_strings['token-B']}"},
+            headers={
+                "Authorization": f"Basic {base64.b64encode(f'podpilot:{token_strings['token-B']}'.encode()).decode()}"
+            },
         )
 
         # ------------------------------------------------------------------
@@ -280,9 +300,12 @@ async def test_token_verify_success(async_client):
 
         verify_response = await async_client.post(
             "/token/verify",
-            headers={"Authorization": f"Bearer {token_value}"},
+            headers={
+                "Authorization": f"Basic {base64.b64encode(f'podpilot:{token_value}'.encode()).decode()}"
+            },
         )
         assert verify_response.status_code == 200
+        assert verify_response.headers["x-token-user"] == "testuser"
         assert verify_response.json()["valid"] is True
         assert verify_response.json()["user"] == "testuser"
     finally:
@@ -357,7 +380,10 @@ async def test_last_used_not_updated_on_failed_verify(async_client: AsyncClient)
         # 2. Successful verify → sets last_used
         # ------------------------------------------------------------------
         ok_resp = await async_client.post(
-            "/token/verify", headers={"Authorization": f"Bearer {good_token}"}
+            "/token/verify",
+            headers={
+                "Authorization": f"Basic {base64.b64encode(f'podpilot:{good_token}'.encode()).decode()}"
+            },
         )
         assert ok_resp.status_code == 200
 
@@ -373,7 +399,10 @@ async def test_last_used_not_updated_on_failed_verify(async_client: AsyncClient)
         bad_token = f"tk_{prefix}_{secrets.token_urlsafe(64)}"
 
         fail_resp = await async_client.post(
-            "/token/verify", headers={"Authorization": f"Bearer {bad_token}"}
+            "/token/verify",
+            headers={
+                "Authorization": f"Basic {base64.b64encode(f'podpilot:{bad_token}'.encode()).decode()}"
+            },
         )
         assert fail_resp.status_code == 401
 
@@ -411,8 +440,10 @@ async def test_last_used_monotonically_increases(async_client: AsyncClient):
             "/token", json={"name": token_name, "expires_at": expires_at}
         )
         assert create_resp.status_code == 201
-        bearer = create_resp.json()["token"]
-        auth_hdr = {"Authorization": f"Bearer {bearer}"}
+        token = create_resp.json()["token"]
+        auth_hdr = {
+            "Authorization": f"Basic {base64.b64encode(f'podpilot:{token}'.encode()).decode()}"
+        }
 
         timestamps: list[datetime] = []
 
@@ -455,7 +486,10 @@ async def test_revoke_token(async_client):
         token = response.json()["token"]
 
         response = await async_client.post(
-            "/token/verify", headers={"Authorization": f"Bearer {token}"}
+            "/token/verify",
+            headers={
+                "Authorization": f"Basic {base64.b64encode(f'podpilot:{token}'.encode()).decode()}"
+            },
         )
         assert response.status_code == 200
         assert response.json()["valid"] is True
@@ -466,7 +500,10 @@ async def test_revoke_token(async_client):
         assert response.json() == {"revoked": True}
 
         response = await async_client.post(
-            "/token/verify", headers={"Authorization": f"Bearer {token}"}
+            "/token/verify",
+            headers={
+                "Authorization": f"Basic {base64.b64encode(f'podpilot:{token}'.encode()).decode()}"
+            },
         )
         assert response.status_code == 401
     finally:
@@ -520,7 +557,10 @@ async def test_token_last_used_updated(async_client):
         token_value = response.json()["token"]
 
         await async_client.post(
-            "/token/verify", headers={"Authorization": f"Bearer {token_value}"}
+            "/token/verify",
+            headers={
+                "Authorization": f"Basic {base64.b64encode(f'podpilot:{token_value}'.encode()).decode()}"
+            },
         )
 
         list_response = await async_client.get("/token")

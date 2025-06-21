@@ -4,7 +4,7 @@ import os
 from contextlib import asynccontextmanager
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, Header, HTTPException, status
+from fastapi import Depends, FastAPI, Header, HTTPException, Response, status
 
 from .auth import get_current_username, verifier
 from .data import TokensDataAccess, UsersDataAccess
@@ -114,6 +114,7 @@ async def create_token(
 @app.post("/token/verify", response_model=VerifyResponse)
 async def verify(
     authorization: Annotated[str, Header()],
+    response: Response,
     tokens_data_access: TokensDataAccess = Depends(),
 ):
     if not authorization.startswith("Basic "):
@@ -154,7 +155,9 @@ async def verify(
                 "WWW-Authenticate": 'Basic realm="tokenkeeper", error="invalid_token"'
             },
         ) from exc
+
     logger.info("Verifying token with prefix '%s'", prefix)
+
     async with tokens_data_access.lock_active_token(prefix) as token:
         if not (token and verify_token(secret, token.hashed_token)):
             logger.warning("Token verification failed for prefix '%s'", prefix)
@@ -166,11 +169,14 @@ async def verify(
                 },
             )
         tokens_data_access.touch_token(token)
+
     logger.info(
         "Token verified successfully for user '%s' (prefix: '%s')",
         token.user,
         prefix,
     )
+
+    response.headers["X-Token-User"] = token.user
     return VerifyResponse(valid=True, user=token.user)
 
 
